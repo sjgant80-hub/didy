@@ -1,0 +1,22 @@
+name: witness
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: assertion suites
+        run: |
+          node core.test.mjs
+          node shadow.test.mjs
+          node conductor.test.mjs
+          node cascade.test.mjs
+      - name: mutation gate (witness)
+        run: |
+          git clone --depth 1 https://github.com/sjgant80-hub/witness.git .witness
+          node .witness/witness.mjs mutate core.mjs      --cap 200 --baseline witness.baseline.json --test node core.test.mjs
+          node .witness/witness.mjs mutate shadow.mjs    --cap 200 --test node shadow.test.mjs
+          node .witness/witness.mjs mutate conductor.mjs --cap 200 --test node conductor.test.mjs
+          node .witness/witness.mjs mutate cascade.mjs   --cap 200 --test node cascade.test.mjs

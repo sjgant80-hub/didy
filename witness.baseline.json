@@ -1,0 +1,12 @@
+[
+  {
+    "mutation": "> → >=",
+    "snippet": "const clamp01 = x => (x < 0 ? 0 : (x > 1 ? 1 : x));",
+    "reason": "clamp01 boundary: at x exactly 0 (x<0?0) and exactly 1 (x>1?1) the returned value is identical under < vs <= and > vs >= — the canonical known-equivalent clamp mutant."
+  },
+  {
+    "mutation": "< → <=",
+    "snippet": "const clamp01 = x => (x < 0 ? 0 : (x > 1 ? 1 : x));",
+    "reason": "clamp01 boundary: at x exactly 0 (x<0?0) and exactly 1 (x>1?1) the returned value is identical under < vs <= and > vs >= — the canonical known-equivalent clamp mutant."
+  }
+]

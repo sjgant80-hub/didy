@@ -1,0 +1,187 @@
+<meta charset="utf-8">
+<title>Didy — the trainable conductor</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Didy is the trainable conductor of fall-os: one control loop over your own models, local-first, where a request can never reach a tier you have not allowed.">
+<meta name="theme-color" content="#0a0d13">
+<style>
+  :root{--bg:#f7f8fa;--panel:#fff;--panel2:#f1f4f8;--ink:#0d1520;--muted:#576373;--faint:#8a94a3;--line:#e3e8ef;
+        --accent:#2f9e6e;--accent2:#3b5bdb;--ok:#0c9463;--warn:#d9880a;
+        --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,system-ui,sans-serif;
+        --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--r:14px}
+  @media(prefers-color-scheme:dark){:root{--bg:#0a0d13;--panel:#121822;--panel2:#161d29;--ink:#e8eef6;--muted:#8d99a9;--faint:#5b6675;--line:#1e2733;--accent:#37c48a;--accent2:#5c7cfa;--ok:#2fbd85;--warn:#e6a23c}}
+  :root[data-theme=dark]{--bg:#0a0d13;--panel:#121822;--panel2:#161d29;--ink:#e8eef6;--muted:#8d99a9;--faint:#5b6675;--line:#1e2733;--accent:#37c48a;--accent2:#5c7cfa;--ok:#2fbd85;--warn:#e6a23c}
+  :root[data-theme=light]{--bg:#f7f8fa;--panel:#fff;--panel2:#f1f4f8;--ink:#0d1520;--muted:#576373;--faint:#8a94a3;--line:#e3e8ef;--accent:#2f9e6e;--accent2:#3b5bdb;--ok:#0c9463;--warn:#d9880a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.62;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(900px 520px at 15% -8%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 62%),radial-gradient(760px 440px at 90% 4%,color-mix(in srgb,var(--accent2) 10%,transparent),transparent 60%)}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+  a{color:var(--accent2);text-decoration:none}a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.88em;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:.08em .38em}
+  .mono{font-family:var(--mono)}
+  nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;gap:14px;height:58px}
+  .brand{font-weight:800;letter-spacing:-.03em;display:flex;align-items:center;gap:9px}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+  .links{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:.88rem;flex-wrap:wrap}
+  .btn{display:inline-block;padding:.5rem .9rem;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:.85rem;cursor:pointer;font-family:var(--sans)}
+  .btn:hover{border-color:var(--accent);text-decoration:none}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#04140d;font-weight:650}
+  header{padding:76px 0 56px}
+  h1{font-size:clamp(2.4rem,6.5vw,3.9rem);margin:.4rem 0 .3rem;font-weight:850;letter-spacing:-.035em;
+     background:linear-gradient(120deg,var(--ink) 34%,var(--accent) 76%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .sub{font-size:clamp(1.05rem,2.4vw,1.35rem);font-weight:600;margin:.2rem 0 .5rem}
+  .lead{color:var(--muted);font-size:1.06rem;max-width:70ch}
+  .cta{display:flex;gap:11px;flex-wrap:wrap;margin-top:26px}
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  h2{font-size:clamp(1.5rem,3.2vw,2rem);margin:.3rem 0 .7rem;letter-spacing:-.02em}
+  .grid{display:grid;gap:15px;margin-top:22px}
+  .c3{grid-template-columns:repeat(3,1fr)}.c2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:860px){.c3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:620px){.c3,.c2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:19px;transition:border-color .18s,transform .18s}
+  .card:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));transform:translateY(-2px)}
+  .card h3{margin:0 0 .35rem;font-size:1rem}
+  .card p{margin:0;color:var(--muted);font-size:.92rem}
+  .ic{font-family:var(--mono);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;display:inline-block;margin-bottom:.5rem;padding:.14rem .5rem;border:1px solid color-mix(in srgb,var(--accent) 26%,var(--line));border-radius:20px}
+  .tier{display:grid;grid-template-columns:60px 1fr auto;gap:13px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 15px;margin-bottom:7px}
+  .tier .t{font-family:var(--mono);font-size:.73rem;font-weight:700;color:var(--accent)}
+  .tier b{font-size:.95rem}.tier p{margin:.1rem 0 0;color:var(--muted);font-size:.84rem}
+  .tag{font-family:var(--mono);font-size:.67rem;padding:.2rem .55rem;border-radius:20px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .tier.local{border-left:3px solid var(--ok)}.tier.local .tag{color:var(--ok)}
+  .tier.opt{border-left:3px solid var(--warn)}.tier.opt .tag{color:var(--warn)}
+  @media(max-width:620px){.tier{grid-template-columns:50px 1fr}.tier .tag{grid-column:2;justify-self:start}}
+  .demo{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-top:22px}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .out{font-family:var(--mono);font-size:.84rem;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;min-height:96px;white-space:pre-wrap;line-height:1.65}
+  .ok{color:var(--ok)}.no{color:var(--warn)}
+  label{font-size:.86rem;color:var(--muted);display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:520px}
+  th{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);background:var(--panel2)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--muted)}
+  td b{color:var(--ink)}td.g{color:var(--ok);font-family:var(--mono);font-size:.82rem;white-space:nowrap}
+  .tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);margin-top:10px}
+  footer{padding:44px 0;color:var(--muted);font-size:.88rem;border-top:1px solid var(--line)}
+  .theme{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.8rem}
+</style>
+
+<nav><div class="wrap">
+  <span class="brand"><span class="dot"></span>Didy</span>
+  <div class="links">
+    <a href="#how">How it works</a>
+    <a href="#cascade">The cascade</a>
+    <a href="#demo">Demo</a>
+    <button class="theme" id="theme">Theme</button>
+    <a class="btn" href="https://www.ai-nativesolutions.com/fall-os-deck.pdf" download style="border-color:var(--accent);color:var(--accent)">↓ Deck PDF</a>
+    <a class="btn" href="https://www.ai-nativesolutions.com/fall-os-prospectus.pdf" download>↓ Prospectus PDF</a>
+    <a class="btn" href="https://github.com/sjgant80-hub/didy" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div></nav>
+
+<header><div class="wrap">
+  <span class="eyebrow">The trainable conductor of fall-os</span>
+  <h1>Didy</h1>
+  <p class="sub">One loop. Your models. Nothing leaves without your say-so.</p>
+  <p class="lead">A Didy is the conductor: the single control loop that turns a plain-language instruction into work across everything you own. It runs on <strong>your own models first</strong> and escalates to a paid API only where you have allowed it — and that is a structural guarantee, not a setting. A fresh Didy ships blank; you train it by registering organs and sign it with your own prefix.</p>
+  <div class="cta">
+    <a class="btn primary" href="#demo">Try the cascade</a>
+    <a class="btn" href="https://sjgant80-hub.github.io/fall-os/" target="_blank" rel="noopener">fall-os →</a>
+    <a class="btn" href="https://www.ai-nativesolutions.com/fall-os-deck.pdf" download>↓ Deck (PDF)</a>
+    <a class="btn" href="https://www.ai-nativesolutions.com/fall-os-prospectus.pdf" download>↓ Prospectus (PDF)</a>
+  </div>
+</div></header>
+
+<section id="how"><div class="wrap">
+  <span class="eyebrow">What it is</span>
+  <h2>A conductor you train, not an assistant you rent</h2>
+  <p class="lead">Every request runs the same five phases, and each one calls the shared core rather than its own logic — so improving the core improves every organ the Didy conducts.</p>
+  <div class="grid c3">
+    <div class="card"><span class="ic">Blank on arrival</span><h3>Ships untrained</h3><p>A fresh instance is <code>didy</code> — no organs, no owner. It is a slot, not a product with someone else's decisions baked in.</p></div>
+    <div class="card"><span class="ic">You train it</span><h3>Register organs</h3><p>Registering an organ tells it how to expand options, how to score them, and optionally how to commit. Its own logic is untouched.</p></div>
+    <div class="card"><span class="ic">You sign it</span><h3>It becomes yours</h3><p>Sign it with your prefix and it becomes a <code>&lt;prefix&gt;-didy</code> — a named instance on the lineage, distinct from anyone else's.</p></div>
+    <div class="card"><span class="ic">Grounded</span><h3>It never commits alone</h3><p>It expands and scores, then waits. A candidate is selected only when an author commits — a person, or an automated check you configured.</p></div>
+    <div class="card"><span class="ic">Bounded</span><h3>It cannot overspend</h3><p>Autonomy is granted per organ and bounded by a signed budget it cannot exceed, because the grant is what it holds.</p></div>
+    <div class="card"><span class="ic">Remembers</span><h3>Keeps what it passed over</h3><p>Every alternative it did not take is indexed, so a direction you keep circling surfaces on its own instead of being lost.</p></div>
+  </div>
+</div></section>
+
+<section id="cascade"><div class="wrap">
+  <span class="eyebrow">The cascade</span>
+  <h2>Local first. Frontier only if you allow it.</h2>
+  <p class="lead">A request descends to the cheapest tier that can answer it. The first four run on hardware you own. The last two leave the machine, so they are consent-gated — and if you have not granted them, the provider is <strong>never invoked at all</strong>. The prompt is not serialised outward, so there is nothing to leak.</p>
+  <div style="margin-top:22px">
+    <div class="tier local"><span class="t">T0</span><div><b>Built-in logic</b><p>Deterministic kernels and templates — answers needing no model.</p></div><span class="tag">on-device</span></div>
+    <div class="tier local"><span class="t">T1</span><div><b>In-browser model</b><p>A small model in the page. No install, works offline.</p></div><span class="tag">on-device</span></div>
+    <div class="tier local"><span class="t">T2</span><div><b>Your local host</b><p>Mid-size models over localhost — a 14B class model on ordinary hardware.</p></div><span class="tag">your machine</span></div>
+    <div class="tier local"><span class="t">T2.5</span><div><b>Large local</b><p>Heavier weights where the hardware allows.</p></div><span class="tag">your machine</span></div>
+    <div class="tier opt"><span class="t">T3</span><div><b>Free-tier API</b><p>Optional burst capacity under your own account.</p></div><span class="tag">consent</span></div>
+    <div class="tier opt"><span class="t">T4</span><div><b>Frontier model</b><p>Maximum capability on demand — never required for the system to run.</p></div><span class="tag">consent</span></div>
+  </div>
+</div></section>
+
+<section id="demo"><div class="wrap">
+  <span class="eyebrow">See it refuse</span>
+  <h2>The guarantee, running</h2>
+  <p class="lead">This is the real <code>cascade.mjs</code> the tests verify. The remote tiers below are wired to a provider that <em>would</em> answer eagerly — it records every prompt it ever sees. Ask without granting consent and watch it never get called.</p>
+  <div class="demo">
+    <div class="row">
+      <label><input type="checkbox" id="t2" checked> local host (T2) available</label>
+      <label><input type="checkbox" id="t3"> allow free API (T3)</label>
+      <label><input type="checkbox" id="t4"> allow frontier (T4)</label>
+    </div>
+    <div class="row">
+      <input id="q" value="summarise this confidential contract" style="flex:1;min-width:220px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);color:var(--ink);font-family:var(--sans);font-size:.9rem">
+      <button class="btn primary" id="run">Ask</button>
+    </div>
+    <div class="out" id="out"></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <span class="eyebrow">Verification</span>
+  <h2>Every module proven, not asserted</h2>
+  <p class="lead">Each kernel has a deterministic suite <em>and</em> a mutation gate that breaks the source one operator at a time and requires the tests to catch it. A green suite that cannot detect a broken version does not count.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Module</th><th>Responsibility</th><th>Mutation gate</th></tr></thead>
+    <tbody>
+      <tr><td><b class="mono">cascade.mjs</b></td><td>Local-first routing and the consent guarantee.</td><td class="g">18/18 · clean</td></tr>
+      <tr><td><b class="mono">conductor.mjs</b></td><td>The five-phase loop, organ registry, grounded commitment.</td><td class="g">17/17 · clean</td></tr>
+      <tr><td><b class="mono">core.mjs</b></td><td>Shared engine: expand, score, commit, cache.</td><td class="g">10/12 · clean</td></tr>
+      <tr><td><b class="mono">shadow.mjs</b></td><td>The index of options not taken.</td><td class="g">10/10 · clean</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<footer><div class="wrap">
+  <div style="font-weight:650;color:var(--ink);margin-bottom:6px">Powered by Konomi architecture</div>
+  Didy is the conductor of <a href="https://sjgant80-hub.github.io/fall-os/">fall-os</a>. Pure ES modules · zero runtime dependencies · mutation-gated in CI · this page imports the same source the tests verify.
+</div></footer>
+
+<script type="module">
+import { ask, explain, stayedLocal, TIERS } from './cascade.mjs?v=1';
+const $=id=>document.getElementById(id);
+$('theme').onclick=()=>{const r=document.documentElement,c=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',c==='dark'?'light':'dark');};
+function run(){
+  const seen=[];                                        // spy: records every prompt a remote tier sees
+  const remote=p=>{seen.push(p);return{text:'(frontier answer)',confidence:0.95};};
+  const providers={T0:()=>null, T3:remote, T4:remote};
+  if($('t2').checked) providers.T2=p=>({text:'answered on your own machine',confidence:0.85});
+  const allow=[]; if($('t3').checked) allow.push('T3'); if($('t4').checked) allow.push('T4');
+  const r=ask({providers,allow},$('q').value);
+  const lines=[];
+  lines.push(r.ok?`✔ ${r.text}`:`✖ no answer`);
+  lines.push(`   ${explain(r)}`);
+  lines.push(`   tiers actually invoked: ${r.tried.length?r.tried.join(', '):'none'}`);
+  lines.push(`   stayed on your hardware: ${stayedLocal(r)?'yes':'no'}`);
+  lines.push('');
+  lines.push(seen.length===0
+    ? `🔒 the remote provider was NEVER INVOKED — it saw ${seen.length} prompts. Your text was never serialised outward.`
+    : `⚠ the remote provider was invoked and saw: ${JSON.stringify(seen)} — because you granted consent.`);
+  const el=$('out'); el.textContent=lines.join('\n');
+  el.className='out '+(seen.length===0?'ok':'no');
+}
+$('run').onclick=run; $('q').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+for(const id of ['t2','t3','t4']) $(id).addEventListener('change',run);
+run();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
