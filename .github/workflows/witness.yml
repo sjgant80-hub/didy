@@ -13,6 +13,7 @@ jobs:
           node shadow.test.mjs
           node conductor.test.mjs
           node cascade.test.mjs
+          node providers.test.mjs
       - name: mutation gate (witness)
         run: |
           git clone --depth 1 https://github.com/sjgant80-hub/witness.git .witness
@@ -20,3 +21,4 @@ jobs:
           node .witness/witness.mjs mutate shadow.mjs    --cap 200 --test node shadow.test.mjs
           node .witness/witness.mjs mutate conductor.mjs --cap 200 --test node conductor.test.mjs
           node .witness/witness.mjs mutate cascade.mjs   --cap 200 --test node cascade.test.mjs
+          node .witness/witness.mjs mutate providers.mjs --cap 200 --baseline providers.baseline.json --test node providers.test.mjs

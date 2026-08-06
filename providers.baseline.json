@@ -1,0 +1,12 @@
+[
+  {
+    "mutation": "&& → ||",
+    "snippet": "const text = j && typeof j.response === 'string' ? j.response.trim() : '';",
+    "reason": "Equivalent: with a null body the mutant evaluates typeof j.response on null, which throws and is caught by the surrounding try, returning null — the same value the guard returns. With a non-string response it reaches .trim() on a non-string, which also throws into the same catch. Both paths yield null either way, so no input distinguishes them."
+  },
+  {
+    "mutation": "|| → &&",
+    "snippet": "if (!res || !res.ok) return null;",
+    "reason": "Equivalent: with a null response the mutant evaluates !res.ok on null, which throws and is caught, returning null — the same value the guard returns. With a non-ok response the guard and the mutant agree. No input distinguishes them."
+  }
+]

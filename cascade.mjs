@@ -65,6 +65,36 @@ export function ask(cascade, prompt, { threshold = 0.5, ctx = null } = {}) {
            best: best || null };
 }
 
+// ── askAsync: the same descent, for providers that are asynchronous (a real model call, an HTTP
+//    endpoint). ask() is synchronous and treats a returned Promise as a decline, which silently
+//    disables every real provider — so anything backed by a network MUST use this. The consent
+//    guarantee is identical and enforced the same way: a tier that is not permitted is never invoked,
+//    so nothing is awaited and no prompt is serialised outward. ──
+export async function askAsync(cascade, prompt, { threshold = 0.5, ctx = null } = {}) {
+  const src = cascade || {};
+  const providers = (src.providers && typeof src.providers === "object") ? src.providers : {};
+  const allow = src.allow;
+  const p = String(prompt == null ? "" : prompt);
+  const tried = [], declined = [];
+  let best = null;
+  for (const t of TIERS) {
+    if (!permits(allow, t.id)) { declined.push({ id: t.id, why: "not permitted" }); continue; }
+    const fn = providers[t.id];
+    if (typeof fn !== "function") { declined.push({ id: t.id, why: "unavailable" }); continue; }
+    tried.push(t.id);
+    let r = null;
+    try { r = await fn(p, ctx); } catch { declined.push({ id: t.id, why: "errored" }); continue; }
+    const c = conf(r);
+    if (!r || typeof r.text !== "string" || !r.text) { declined.push({ id: t.id, why: "declined" }); continue; }
+    if (c >= threshold) return { ok: true, text: r.text, tier: t.id, local: t.local, confidence: c, tried, declined };
+    declined.push({ id: t.id, why: "below threshold" });
+    if (!best || c > best.confidence) best = { text: r.text, tier: t.id, local: t.local, confidence: c };
+  }
+  return { ok: false, text: null, tier: null, local: true, tried, declined,
+           reason: "no permitted tier answered at or above the threshold — grant a higher tier or lower the threshold",
+           best: best || null };
+}
+
 // A plain-language account of where a request went and where it did not — for the operator, not the log.
 export function explain(result) {
   if (!result) return '';
@@ -75,4 +105,4 @@ export function explain(result) {
 // Did this run stay entirely on hardware the operator owns?
 export const stayedLocal = result => !!result && result.tried.every(isLocal);
 
-export default { TIERS, tier, isLocal, allowed, permits, ask, explain, stayedLocal };
+export default { TIERS, tier, isLocal, allowed, permits, ask, askAsync, explain, stayedLocal };

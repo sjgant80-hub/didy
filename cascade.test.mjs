@@ -2,7 +2,7 @@
 // The load-bearing property is §2: a request CANNOT reach a tier the operator has not allowed —
 // proved by spy providers that record whether they were invoked at all. If the remote provider is
 // never called, the prompt was never serialised outward; that is a structural guarantee, not a policy.
-import { TIERS, tier, isLocal, allowed, permits, ask, explain, stayedLocal } from './cascade.mjs';
+import { TIERS, tier, isLocal, allowed, permits, ask, askAsync, explain, stayedLocal } from './cascade.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? '  ✓ ' : '  ✗ FAIL ') + m); };
@@ -91,6 +91,47 @@ console.log('\n=== §7 · CONSENT BOOKKEEPING + DETERMINISM + FUZZ ===');
   ask({ allow: [], providers: { T0: seen } }, null);
   ask({ allow: [], providers: { T0: seen } }, undefined);
   ok(seen.calls.length === 2 && seen.calls.every(c => c === ""), `a null or undefined prompt is normalised to empty text, never "null" (got ${JSON.stringify(seen.calls)})`);
+}
+
+
+console.log('\n=== §8 · askAsync — the SAME guarantees for asynchronous providers ===');
+{
+  // ask() is synchronous and treats a Promise as a decline, which silently disables every real
+  // provider. askAsync exists for those, and must hold every property ask holds.
+  const aspy = (text, confidence) => { const calls = []; const fn = async p => { calls.push(p); return text === null ? null : { text, confidence }; }; fn.calls = calls; return fn; };
+
+  const remote = aspy('leaked', 1);
+  const r0 = await askAsync({ allow: [], providers: { T0: async () => null, T4: remote } }, 'confidential');
+  ok(remote.calls.length === 0 && r0.ok === false, 'the consent guarantee holds asynchronously — a disallowed tier is never awaited, so nothing is serialised outward');
+
+  const t2 = aspy('local', 0.9), t4 = aspy('frontier', 1);
+  const r1 = await askAsync({ allow: ['T4'], providers: { T2: t2, T4: t4 } }, 'q');
+  ok(r1.ok && r1.tier === 'T2' && t4.calls.length === 0, 'local-first holds: an answering local tier ends the descent and the permitted frontier tier is never called');
+
+  const exact = await askAsync({ allow: [], providers: { T2: async () => ({ text: 'on the line', confidence: 0.5 }) } }, 'q', { threshold: 0.5 });
+  ok(exact.ok === true, 'exactly at the threshold is accepted (pins c >= threshold in the async path)');
+
+  const tie = await askAsync({ allow: [], providers: { T0: async () => ({ text: 'earlier', confidence: 0.4 }), T2: async () => ({ text: 'later', confidence: 0.4 }) } }, 'q', { threshold: 0.9 });
+  ok(tie.best.text === 'earlier' && tie.best.tier === 'T0', 'an equal-confidence tie keeps the earlier tier as best (pins the strict >)');
+  ok(tie.best !== null && tie.ok === false, 'a sub-threshold best is reported without being returned as the answer');
+
+  const rejected = await askAsync({ allow: [], providers: { T0: async () => ({ text: '', confidence: 1 }), T2: async () => ({ confidence: 1 }) } }, 'q');
+  ok(rejected.ok === false && rejected.declined.filter(d => d.why === 'declined').length === 2, 'an empty string and a missing text field are both declines, never hollow answers');
+
+  const notFn = await askAsync({ allow: [], providers: { T0: 'not a function', T2: async () => ({ text: 'ok', confidence: 1 }) } }, 'q');
+  ok(notFn.ok && notFn.tier === 'T2' && notFn.declined.some(d => d.id === 'T0' && d.why === 'unavailable'), 'a non-function provider is unavailable rather than invoked');
+
+  const threwP = await askAsync({ allow: [], providers: { T0: async () => { throw new Error('x'); }, T2: async () => ({ text: 'recovered', confidence: 1 }) } }, 'q');
+  ok(threwP.ok && threwP.declined.some(d => d.id === 'T0' && d.why === 'errored'), 'a rejecting provider is recorded as errored and the descent continues');
+
+  const seen = aspy('ok', 1);
+  await askAsync({ allow: [], providers: { T0: seen } }, null);
+  ok(seen.calls[0] === '', 'a null prompt is normalised to empty text in the async path too, never the string "null"');
+
+  let threw = false;
+  try { await askAsync(null, 'q'); await askAsync({ providers: null, allow: null }, ''); await askAsync({}, null); }
+  catch { threw = true; }
+  ok(!threw, 'null cascades and null providers never raise in the async path');
 }
 
 const done = fail === 0;
