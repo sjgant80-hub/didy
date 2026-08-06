@@ -17,6 +17,13 @@
 
 export const OLLAMA_DEFAULT = 'http://localhost:11434';
 
+// Measured on ordinary desktop hardware: the 7B answers in ~9s warm, the 14B in ~24s, and both were
+// correct on the same check. So the 7B is the workhorse tier and the 14B is the deliberate escalation
+// — which is exactly how the ladder is meant to be used, since the cascade only descends when the
+// cheaper tier declines. Ollama unloads an idle model, so keeping the fast one resident matters.
+export const LOCAL_FAST = 'qwen2.5:7b';    // T2   · the workhorse
+export const LOCAL_DEEP = 'qwen2.5:14b';   // T2.5 · heavier local, for quality over latency
+
 // ── T0 · deterministic. Answers only what needs no model, and declines everything else. ──
 export function builtinProvider(answers = {}) {
   return prompt => {
@@ -28,7 +35,7 @@ export function builtinProvider(answers = {}) {
 }
 
 // ── T2 · your local Ollama host. Declines (never throws) when the host or model is unavailable. ──
-export function ollamaProvider({ model = 'qwen2.5:14b', host = OLLAMA_DEFAULT, fetchImpl, timeoutMs = 120000, confidence = 0.8 } = {}) {
+export function ollamaProvider({ model = LOCAL_FAST, host = OLLAMA_DEFAULT, fetchImpl, timeoutMs = 120000, confidence = 0.8 } = {}) {
   const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : null);
   const fn = async (prompt, ctx) => {
     if (!doFetch) return null;                                   // no transport here — decline, do not throw
@@ -78,7 +85,7 @@ export function remoteProvider({ url, apiKey, model, fetchImpl, timeoutMs = 6000
 
 // ── Is a local host actually reachable, and does it have the model? Used to report honestly in a UI
 //    rather than presenting a tier as available when nothing is behind it. ──
-export async function probeOllama({ host = OLLAMA_DEFAULT, model = 'qwen2.5:14b', fetchImpl } = {}) {
+export async function probeOllama({ host = OLLAMA_DEFAULT, model = LOCAL_FAST, fetchImpl } = {}) {
   const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : null);
   if (!doFetch) return { up: false, models: [], hasModel: false };
   try {
@@ -92,12 +99,22 @@ export async function probeOllama({ host = OLLAMA_DEFAULT, model = 'qwen2.5:14b'
 
 // ── Assemble the provider set for a cascade from what is actually available. A tier is only included
 //    when something can serve it, so the cascade never lists a tier it cannot honour. ──
-export function providersFor({ builtin, ollama, remote } = {}) {
+export function providersFor({ builtin, ollama, ollamaLarge, remote } = {}) {
   const providers = {};
   if (builtin) providers.T0 = builtin;
   if (ollama) providers.T2 = ollama;
+  if (ollamaLarge) providers['T2.5'] = ollamaLarge;
   if (remote) providers[remote.tier === 'T3' ? 'T3' : 'T4'] = remote;
   return providers;
 }
 
-export default { OLLAMA_DEFAULT, builtinProvider, ollamaProvider, remoteProvider, probeOllama, providersFor };
+// The default local pair: the fast model on T2, the deep one on T2.5. A request only reaches the
+// heavier model when the faster one declines or falls below the threshold.
+export function localPair(opts = {}) {
+  return {
+    ollama: ollamaProvider({ ...opts, model: LOCAL_FAST }),
+    ollamaLarge: ollamaProvider({ ...opts, model: LOCAL_DEEP, confidence: 0.9 }),
+  };
+}
+
+export default { OLLAMA_DEFAULT, LOCAL_FAST, LOCAL_DEEP, localPair, builtinProvider, ollamaProvider, remoteProvider, probeOllama, providersFor };

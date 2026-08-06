@@ -4,7 +4,7 @@
 // The properties that matter: an unreachable backend DECLINES rather than throwing (so the cascade
 // descends instead of failing), an empty answer is a decline rather than hollow text, and a remote
 // adapter holds no privilege that could bypass consent.
-import { builtinProvider, ollamaProvider, remoteProvider, probeOllama, providersFor, OLLAMA_DEFAULT } from './providers.mjs';
+import { builtinProvider, ollamaProvider, remoteProvider, probeOllama, providersFor, localPair, LOCAL_FAST, LOCAL_DEEP, OLLAMA_DEFAULT } from './providers.mjs';
 import { askAsync, stayedLocal } from './cascade.mjs';
 
 let pass = 0, fail = 0;
@@ -143,6 +143,28 @@ console.log("\n=== §9 · AMBIENT TRANSPORT — with no transport injected, the 
     ok(pr.up === true && pr.hasModel === true, "the probe uses the ambient transport when none is injected");
     ok(hits === 3, "all three went through the stub — no real network call was made");
   } finally { globalThis.fetch = real; }
+}
+
+
+console.log('\n=== §10 · THE LOCAL PAIR — fast model on T2, deep model on T2.5 ===');
+{
+  ok(LOCAL_FAST === 'qwen2.5:7b' && LOCAL_DEEP === 'qwen2.5:14b', 'the fast rung is the 7B and the deep rung is the 14B');
+  ok(ollamaProvider({}).model === LOCAL_FAST, 'an ollama adapter defaults to the FAST model — the workhorse, not the slow one');
+  const pair = localPair({ fetchImpl: async () => ({ ok: true, json: async () => ({ response: 'x' }) }) });
+  ok(pair.ollama.model === LOCAL_FAST && pair.ollamaLarge.model === LOCAL_DEEP, 'localPair puts the fast model in front and the deep model behind it');
+  const providers = providersFor({ builtin: builtinProvider({}), ...pair });
+  ok(Object.keys(providers).sort().join(',') === 'T0,T2,T2.5', 'both local rungs are offered, and only the local ones');
+  // the deep rung must only be reached when the fast one cannot answer
+  const calls = [];
+  const mk = (name, text, confidence) => { const f = async p => { calls.push(name); return text === null ? null : { text, confidence }; }; return f; };
+  const fastAnswers = { T2: mk('fast', 'fast answer', 0.8), 'T2.5': mk('deep', 'deep answer', 0.9) };
+  const r1 = await askAsync({ providers: fastAnswers, allow: [] }, 'q');
+  ok(r1.tier === 'T2' && !calls.includes('deep'), 'when the fast model answers, the deep model is never loaded — the latency and the memory are both avoided');
+  calls.length = 0;
+  const fastDeclines = { T2: mk('fast', null), 'T2.5': mk('deep', 'deep answer', 0.9) };
+  const r2 = await askAsync({ providers: fastDeclines, allow: [] }, 'q');
+  ok(r2.ok && r2.tier === 'T2.5' && r2.local === true, 'when the fast model declines it escalates to the deep one — still entirely on the operator’s hardware');
+  ok(probeOllama.length >= 0 && (await probeOllama({ fetchImpl: async () => ({ ok: true, json: async () => ({ models: [{ name: LOCAL_FAST }] }) }) })).hasModel === true, 'the probe defaults to checking for the fast model');
 }
 
 const done = fail === 0;
